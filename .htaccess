@@ -1,0 +1,21 @@
+# .htaccess
+
+# This file is used for URL rewriting and other server configurations.
+
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    RewriteBase /register-learning/
+    
+    # Redirect all requests to public/index.php
+    RewriteCond %{REQUEST_URI} !^/register-learning/public/
+    RewriteRule ^(.*)$ public/index.php [L,QSA]
+</IfModule>
+
+# PHP settings
+<IfModule mod_php7.c>
+    php_flag display_errors On
+    php_value max_execution_time 300
+    php_value max_input_time 300
+    php_value upload_max_filesize 10M
+    php_value post_max_size 10M
+</IfModule>

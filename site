@@ -1,0 +1,34 @@
+register-learning/
+├── config/
+│   ├── config.php             # ຕັ້ງຄ່າລະບົບ (ມີແລ້ວ)
+│   └── database.php           # ການເຊື່ອມຕໍ່ຖານຂໍ້ມູນ
+├── database/
+│   └── register-learning.sql  # ໂຄງສ້າງຖານຂໍ້ມູນ
+├── public/
+│   ├── assets/
+│   │   ├── css/
+│   │   │   └── style.css
+│   │   ├── js/
+│   │   │   ├── form-validation.js
+│   │   │   └── script.js
+│   │   └── uploads/
+│   │       └── photos/        # ບ່ອນເກັບຮູບນັກສຶກສາ
+│   └── index.php              # ຈຸດເຂົ້າຫຼັກຂອງລະບົບ
+├── src/
+│   ├── classes/
+│   │   ├── AcademicYear.php   # ຈັດການປີການສຶກສາ
+│   │   ├── Database.php       # ຈັດການການເຊື່ອມຕໍ່ຖານຂໍ້ມູນ
+│   │   ├── Major.php          # ຈັດການສາຂາຮຽນ
+│   │   └── Student.php        # ຈັດການຂໍ້ມູນນັກສຶກສາ
+│   └── helpers/
+│       ├── functions.php      # ຟັງຊັ່ນຊ່ວຍເຫຼືອທົ່ວໄປ
+│       └── validation.php     # ຟັງຊັ່ນກວດສອບຂໍ້ມູນ
+└── templates/
+    ├── components/
+    │   ├── footer.php         # ສ່ວນທ້າຍຂອງໜ້າເວັບ
+    │   ├── header.php         # ສ່ວນຫົວຂອງໜ້າເວັບ
+    │   └── navigation.php     # ເມນູນຳທາງ
+    ├── dashboard.php          # ໜ້າຫຼັກ
+    ├── register.php           # ແບບຟອມລົງທະບຽນ
+    ├── students-list.php      # ລາຍການນັກສຶກສາ
+    └── search.php             # ຄົ້ນຫານັກສຶກສາ
