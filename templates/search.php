@@ -145,7 +145,7 @@ if (!empty($searchParams)) {
                                             <?php if (!empty($student['photo'])): ?>
                                                 <div class="flex-shrink-0 h-10 w-10">
                                                     <img class="h-10 w-10 rounded-full object-cover" 
-                                                         src="<?= BASE_URL ?>public/assets/uploads/photos/<?= $student['photo'] ?>" 
+                                                         src="<?= BASE_URL ?>public/uploads/photos/<?= $student['photo'] ?>" 
                                                          alt="<?= $student['first_name'] ?> <?= $student['last_name'] ?>">
                                                 </div>
                                             <?php endif; ?>
