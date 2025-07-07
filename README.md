@@ -1,81 +1,126 @@
-# Student Registration System
+# 🎓 ລະບົບລົງທະບຽນນັກສຶກສາ (Student Registration System)
 
-This project is an online student registration system built using PHP (PDO), MySQL, HTML, Tailwind CSS, and JavaScript. It allows users to register students and manage their information efficiently.
+ລະບົບການລົງທະບຽນນັກສຶກສາສຳລັບວິທະຍາໄລການສຶກສາ ອົງຕື້ສັງຄະ
 
-## Features
+## ✨ ຄຸນສົມບັດ (Features)
 
-- **Student Registration Form**: Collects student information such as first name, last name, gender, date of birth, village, city, province, phone number, email, photo, accommodation type, previous school, major, and academic year.
-- **Student List**: Displays a list of registered students with options to search by name, major, and academic year.
-- **Responsive Design**: Utilizes Tailwind CSS for a modern and responsive user interface.
-- **Form Validation**: JavaScript validation to ensure data integrity before submission.
+- 📝 ລົງທະບຽນນັກສຶກສາໃໝ່
+- 📱 ສ້າງ QR Code ສຳລັບແຕ່ລະນັກສຶກສາ
+- 🎯 ສ້າງບັດນັກສຶກສາ PDF
+- 📊 ຈັດການຂໍ້ມູນນັກສຶກສາ
+- 🔍 ຄົ້ນຫາ ແລະ ການຄັດກອງ
+- 📷 ອັບໂຫຼດຮູບຖ່າຍ
 
-## Project Structure
+## 🛠️ ເຕັກໂນໂລຊີ (Technologies)
+
+- **Backend**: PHP 8.x, MySQL
+- **Frontend**: HTML5, CSS3, JavaScript, Tailwind CSS
+- **PDF Generation**: mPDF
+- **QR Code**: API Service
+- **Icons**: Font Awesome
+- **Alerts**: SweetAlert2
+
+## 📋 ຄວາມຕ້ອງການ (Requirements)
+
+- PHP 8.0 ຫຼື ສູງກວ່າ
+- MySQL 5.7 ຫຼື ສູງກວ່າ
+- Apache/Nginx
+- Composer
+- mPDF Library
+
+## 🚀 ການຕິດຕັ້ງ (Installation)
+
+1. **Clone the repository**
+   ```bash
+   git clone https://github.com/yourusername/register-learning.git
+   cd register-learning
+   ```
+
+2. **Install dependencies**
+   ```bash
+   composer install
+   ```
+
+3. **Database setup**
+   - Import `database/register-learning.sql`
+   - Configure database connection in `config/config.php`
+
+4. **Set permissions**
+   ```bash
+   chmod 755 public/uploads/
+   chmod 755 public/downloads/
+   ```
+
+5. **Access the application**
+   - Navigate to `http://localhost/register-learning`
+
+## 📁 ໂຄງສ້າງໂປລເຈັກ (Project Structure)
 
 ```
-register-learning
-├── config
-│   ├── config.php          # Configuration settings for the application
-│   └── database.php        # Database connection using PDO
-├── database
-│   └── register-learning.sql # SQL schema for the database
-├── public
-│   ├── assets
-│   │   ├── css
-│   │   │   └── style.css   # Custom styles using Tailwind CSS
-│   │   ├── js
-│   │   │   ├── form-validation.js # JavaScript for form validation
-│   │   │   └── script.js    # Additional JavaScript functionalities
-│   │   └── uploads
-│   │       └── photos       # Directory for uploaded student photos
-│   ├── favicon.ico          # Favicon for the application
-│   └── index.php            # Main entry point of the application
-├── src
-│   ├── classes
-│   │   ├── AcademicYear.php # Class for academic year operations
-│   │   ├── Database.php     # Class for database management
-│   │   ├── Major.php        # Class for major operations
-│   │   └── Student.php      # Class for student operations
-│   ├── helpers
-│   │   ├── functions.php     # Helper functions
-│   │   └── validation.php    # Validation functions for form inputs
-│   └── lang
-│       └── la.php           # Language translations in Lao
-├── templates
-│   ├── components
-│   │   ├── footer.php       # Footer component
-│   │   ├── header.php       # Header component
-│   │   └── navigation.php    # Navigation component
-│   ├── dashboard.php        # Dashboard for users
-│   ├── includes
-│   │   └── messages.php      # Success/error messages
-│   ├── register.php         # Registration form template
-│   ├── search.php           # Search functionality for students
-│   └── students-list.php    # List of registered students
-├── .gitignore               # Files to be ignored by Git
-├── .htaccess                # URL rewriting and server configurations
-├── composer.json            # Composer dependencies
-├── package.json             # npm dependencies and scripts
-├── README.md                # Project documentation
-└── tailwind.config.js       # Tailwind CSS configuration
+register-learning/
+├── config/
+│   ├── config.php
+│   └── database.php
+├── public/
+│   ├── assets/
+│   ├── uploads/
+│   └── index.php
+├── src/
+│   ├── classes/
+│   ├── controllers/
+│   └── helpers/
+├── templates/
+│   ├── components/
+│   └── pages/
+├── vendor/
+└── database/
 ```
 
-## Installation
+## 🔧 ການຕັ້ງຄ່າ (Configuration)
 
-1. Clone the repository to your local machine.
-2. Import the `register-learning.sql` file into your MySQL database.
-3. Configure the database connection in `config/database.php`.
-4. Install dependencies using Composer and npm.
-5. Start your local server and navigate to `public/index.php`.
+Copy `config/config.example.php` to `config/config.php` and update:
 
-## Usage
+```php
+define('DB_HOST', 'localhost');
+define('DB_NAME', 'register_learning');
+define('DB_USER', 'root');
+define('DB_PASS', '');
+```
 
-- Access the registration form to add new students.
-- View the list of registered students and use the search feature to find specific records.
+## 📸 ພາບໜ້າຈໍ (Screenshots)
 
-## Contributing
+[Add screenshots here]
 
-Feel free to submit issues or pull requests for improvements or bug fixes.
+## 🤝 ການປະກອບສ່ວນ (Contributing)
 
-## License
+1. Fork the repository
+2. Create your feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'Add amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
 
-This project is open-source and available under the MIT License.
+## 📝 License
+
+This project is open source and available under the [MIT License](LICENSE).
+
+## 👥 ທີມພັດທະນາ (Development Team)
+
+- **Developer**: Your Name
+- **Email**: your.email@example.com
+- **GitHub**: [@yourusername](https://github.com/yourusername)
+
+## 🐛 ລາຍງານປັນຫາ (Bug Reports)
+
+If you find a bug, please create an issue on GitHub with:
+- Bug description
+- Steps to reproduce
+- Expected vs actual behavior
+- Screenshots (if applicable)
+
+## 📞 ສຳລັບການສະໜັບສະໜູນ (Support)
+
+For support, email your.email@example.com or create an issue on GitHub.
+
+---
+
+Made with ❤️ for Education
