@@ -1,479 +1,298 @@
 <?php
-// filepath: c:\xampp\htdocs\register-learning\templates\registration-success.php
-
 // ตรวจสอบว่ามีการเรียกใช้ผ่าน index.php หรือไม่
 if (!defined('BASE_PATH')) {
     header('Location: ../public/index.php');
     exit('Access denied. Please use proper navigation.');
 }
 
-// ตรวจสอบการเชื่อมต่อฐานข้อมูล
-if (!isset($db) || !$db) {
-    die('Database connection not available');
-}
-
-// ตรวจสอบว่าเรามีข้อมูลนักศึกษาที่จำเป็นหรือไม่
-if (!isset($studentData) || empty($studentData)) {
-    $_SESSION['message'] = "ບໍ່ພົບຂໍ້ມູນນັກສຶກສາ";
+// ตรวจสอบว่ามีข้อมูลใน session หรือไม่
+if (!isset($studentData)) {
+    $_SESSION['message'] = "ບໍ່ພົບຂໍ້ມູນການລົງທະບຽນ";
     $_SESSION['message_type'] = "error";
     header("Location: " . BASE_URL . "index.php?page=register");
     exit;
 }
 
-// นำเข้าไฟล์ helper functions
-if (file_exists(BASE_PATH . '/src/helpers/functions.php')) {
-    require_once BASE_PATH . '/src/helpers/functions.php';
+// ลบข้อมูลออกจาก session หลังจากโหลดหน้าเสร็จ
+if (isset($_SESSION['student_data'])) {
+    unset($_SESSION['student_data']);
+    unset($_SESSION['qr_code_data']);
+    unset($_SESSION['registration_success']);
+    unset($_SESSION['show_success_alert']);
 }
-
-// ดึงข้อมูลเพิ่มเติม (ชื่อสาขา, ปีการศึกษา)
-$major_name = 'N/A';
-$academic_year_name = 'N/A';
-
-try {
-    if (file_exists(BASE_PATH . '/src/classes/Major.php')) {
-        require_once BASE_PATH . '/src/classes/Major.php';
-        $majorObj = new Major($db);
-        $major = $majorObj->readOne($studentData['major_id']);
-        if ($major) {
-            $major_name = $major['name'];
-        }
-    }
-
-    if (file_exists(BASE_PATH . '/src/classes/AcademicYear.php')) {
-        require_once BASE_PATH . '/src/classes/AcademicYear.php';
-        $yearObj = new AcademicYear($db);
-        $academicYear = $yearObj->readOne($studentData['academic_year_id']);
-        if ($academicYear) {
-            $academic_year_name = $academicYear['year'];
-        }
-    }
-} catch (Exception $e) {
-    error_log("Error loading additional data: " . $e->getMessage());
-}
-
-// สร้าง QR Code data
-$qr_data = "ນັກສຶກສາ: " . $studentData['first_name'] . " " . $studentData['last_name'] . "\n";
-$qr_data .= "ລະຫັດ: " . ($studentData['student_id'] ?? 'N/A') . "\n";
-$qr_data .= "ສາຂາ: " . $major_name . "\n";
-$qr_data .= "ປີການສຶກສາ: " . $academic_year_name . "\n";
-$qr_data .= "ວັນທີລົງທະບຽນ: " . date('d/m/Y H:i:s');
-
-// สร้าง URL สำหรับ QR Code โดยใช้ API ฟรี
-$qr_code_url = "https://api.qrserver.com/v1/create-qr-code/?size=400x400&format=png&margin=10&data=" . urlencode($qr_data);
 ?>
 
-<!-- Success Animation CSS -->
-<style>
-@keyframes bounce {
-    0%, 20%, 53%, 80%, 100% { transform: translate3d(0,0,0); }
-    40%, 43% { transform: translate3d(0, -30px, 0); }
-    70% { transform: translate3d(0, -15px, 0); }
-    90% { transform: translate3d(0, -4px, 0); }
-}
-
-@keyframes fadeInUp {
-    from {
-        opacity: 0;
-        transform: translateY(30px);
-    }
-    to {
-        opacity: 1;
-        transform: translateY(0);
-    }
-}
-
-.animate-bounce {
-    animation: bounce 1s ease-in-out;
-}
-
-.animate-fadeInUp {
-    animation: fadeInUp 0.6s ease-out;
-}
-
-/* Print Styles */
-@media print {
-    body { background: white !important; }
-    .bg-gradient-to-br { background: white !important; }
-    .shadow-xl { box-shadow: none !important; }
-    button, .hover\:scale-105 { display: none !important; }
-    .print-hidden { display: none !important; }
-}
-</style>
-
-<div class="min-h-screen bg-gradient-to-br from-amber-50 to-orange-100 py-8">
-    <div class="container mx-auto px-4">
-        <div class="max-w-6xl mx-auto">
+<!DOCTYPE html>
+<html lang="lo">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ລົງທະບຽນສຳເລັດ - ວິທະຍາໄລການສຶກສາ</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <link rel="stylesheet" href="<?= BASE_URL ?>public/assets/css/style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Lao:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <style>
+         body, html {
+            font-family: 'Noto Sans Lao', sans-serif;
+        }
+        h1, h2, h3, h4, h5, h6, p, span, div, button, a {
+            font-family: 'Noto Sans Lao', sans-serif;
+        }
+        @keyframes bounce {
+            0%, 20%, 53%, 80%, 100% { transform: translate3d(0,0,0); }
+            40%, 43% { transform: translate3d(0, -30px, 0); }
+            70% { transform: translate3d(0, -15px, 0); }
+            90% { transform: translate3d(0, -4px, 0); }
+        }
+        .animate-bounce { animation: bounce 2s infinite; }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .animate-fade-in { animation: fadeIn 0.6s ease-out; }
+    </style>
+</head>
+<body class="bg-gradient-to-br from-green-50 via-blue-50 to-purple-50 min-h-screen">
+    <div class="container mx-auto px-4 py-8">
+        <div class="max-w-4xl mx-auto">
             
-            <!-- Header Section -->
-            <div class="text-center mb-8 animate-fadeInUp">
-                <div class="inline-block p-4 rounded-full bg-green-100 shadow-lg mb-6">
-                    <i class="fas fa-check-circle text-6xl text-green-600 animate-bounce"></i>
+            <!-- Success Header -->
+            <div class="text-center mb-8 animate-fade-in">
+                <div class="inline-flex items-center justify-center w-24 h-24 bg-green-100 rounded-full mb-6">
+                    <i class="fas fa-check-circle text-5xl text-green-500 animate-bounce"></i>
                 </div>
                 <h1 class="text-4xl md:text-5xl font-bold text-gray-800 mb-4">
-                    🎉 ການລົງທະບຽນສຳເລັດແລ້ວ!
+                    🎉 ລົງທະບຽນສຳເລັດແລ້ວ!
                 </h1>
-                <p class="text-xl text-gray-600 max-w-2xl mx-auto">
-                    ຂໍສະແດງຄວາມຍິນດີ! ການລົງທະບຽນຂອງທ່ານໄດ້ຖືກບັນທຶກເຂົ້າໃນລະບົບສຳເລັດແລ້ວ
+                <p class="text-gray-600 text-lg md:text-xl mb-4">
+                    ຂໍ້ມູນຂອງທ່ານຖືກບັນທຶກໄວ້ໃນລະບົບແລ້ວ
                 </p>
-                <div class="mt-4 inline-flex items-center px-4 py-2 bg-green-100 text-green-800 rounded-full text-sm font-medium">
-                    <i class="fas fa-clock mr-2"></i>
-                    ລົງທະບຽນເມື່ອ: <?= date('d/m/Y H:i:s') ?>
+                <div class="inline-flex items-center px-6 py-3 bg-green-100 rounded-full">
+                    <i class="fas fa-graduation-cap text-green-600 mr-2"></i>
+                    <span class="text-green-800 font-semibold">ຍິນດີຕ້ອນຮັບສູ່ວິທະຍາໄລການສຶກສາ</span>
                 </div>
             </div>
-
-            <!-- Main Content -->
-            <div class="grid lg:grid-cols-2 gap-8 items-start animate-fadeInUp">
-                
-                <!-- ຂໍ້ມູນນັກສຶກສາ -->
-                <div class="space-y-6">
-                    <div class="bg-white rounded-2xl shadow-xl overflow-hidden">
-                        <div class="bg-gradient-to-r from-amber-500 to-orange-500 px-6 py-4">
-                            <h2 class="text-2xl font-bold text-white flex items-center">
-                                <i class="fas fa-user-graduate mr-3"></i>
-                                ຂໍ້ມູນນັກສຶກສາ
-                            </h2>
-                        </div>
-                        <div class="p-6 space-y-4">
-                            <!-- Student ID Card Style -->
-                            <div class="bg-gradient-to-r from-blue-50 to-indigo-50 p-4 rounded-lg border-l-4 border-blue-500">
-                                <div class="flex items-center justify-between">
-                                    <div>
-                                        <p class="text-sm text-gray-600">ລະຫັດນັກສຶກສາ</p>
-                                        <p class="text-2xl font-bold text-blue-600 font-mono" id="student-id">
-                                            <?= htmlspecialchars($studentData['student_id'] ?? 'N/A') ?>
-                                        </p>
-                                    </div>
-                                    <div class="text-blue-500">
-                                        <i class="fas fa-id-card text-3xl"></i>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <!-- Personal Info Grid -->
-                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <div class="space-y-3">
-                                    <div class="flex items-start">
-                                        <div class="w-8 h-8 rounded-full bg-amber-100 flex items-center justify-center mr-3 mt-0.5">
-                                            <i class="fas fa-user text-amber-600 text-sm"></i>
-                                        </div>
-                                        <div class="flex-1">
-                                            <p class="text-sm text-gray-600">ຊື່-ນາມສະກຸນ</p>
-                                            <p class="font-semibold text-gray-800" id="student-name">
-                                                <?= htmlspecialchars($studentData['first_name'] . ' ' . $studentData['last_name']) ?>
-                                            </p>
-                                        </div>
-                                    </div>
-
-                                    <div class="flex items-start">
-                                        <div class="w-8 h-8 rounded-full bg-purple-100 flex items-center justify-center mr-3 mt-0.5">
-                                            <i class="fas fa-venus-mars text-purple-600 text-sm"></i>
-                                        </div>
-                                        <div class="flex-1">
-                                            <p class="text-sm text-gray-600">ເພດ</p>
-                                            <span class="inline-block px-3 py-1 text-sm font-medium rounded-full <?= 
-                                                $studentData['gender'] === 'ຊາຍ' ? 'bg-blue-100 text-blue-800' : 
-                                                ($studentData['gender'] === 'ຍິງ' ? 'bg-pink-100 text-pink-800' : 
-                                                ($studentData['gender'] === 'ພຣະ' ? 'bg-orange-100 text-orange-800' : 'bg-gray-100 text-gray-800'))
-                                            ?>">
-                                                <?= htmlspecialchars($studentData['gender']) ?>
-                                            </span>
-                                        </div>
-                                    </div>
-
-                                    <?php if (!empty($studentData['dob'])): ?>
-                                    <div class="flex items-start">
-                                        <div class="w-8 h-8 rounded-full bg-green-100 flex items-center justify-center mr-3 mt-0.5">
-                                            <i class="fas fa-birthday-cake text-green-600 text-sm"></i>
-                                        </div>
-                                        <div class="flex-1">
-                                            <p class="text-sm text-gray-600">ວັນເກິດ</p>
-                                            <p class="font-semibold text-gray-800">
-                                                <?= htmlspecialchars(date('d/m/Y', strtotime($studentData['dob']))) ?>
-                                            </p>
-                                        </div>
-                                    </div>
-                                    <?php endif; ?>
-                                </div>
-
-                                <div class="space-y-3">
-                                    <?php if (!empty($studentData['phone'])): ?>
-                                    <div class="flex items-start">
-                                        <div class="w-8 h-8 rounded-full bg-green-100 flex items-center justify-center mr-3 mt-0.5">
-                                            <i class="fas fa-phone text-green-600 text-sm"></i>
-                                        </div>
-                                        <div class="flex-1">
-                                            <p class="text-sm text-gray-600">ເບອໂທ</p>
-                                            <a href="https://api.whatsapp.com/send?phone=<?= preg_replace('/[^0-9]/', '', $studentData['phone']) ?>" 
-                                               target="_blank" 
-                                               class="font-semibold text-green-600 hover:text-green-800 flex items-center">
-                                                <i class="fab fa-whatsapp mr-1"></i>
-                                                <?= htmlspecialchars($studentData['phone']) ?>
-                                            </a>
-                                        </div>
-                                    </div>
-                                    <?php endif; ?>
-
-                                    <div class="flex items-start">
-                                        <div class="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center mr-3 mt-0.5">
-                                            <i class="fas fa-graduation-cap text-blue-600 text-sm"></i>
-                                        </div>
-                                        <div class="flex-1">
-                                            <p class="text-sm text-gray-600">ສາຂາວິຊາ</p>
-                                            <p class="font-semibold text-gray-800" id="major-name"><?= htmlspecialchars($major_name) ?></p>
-                                        </div>
-                                    </div>
-
-                                    <div class="flex items-start">
-                                        <div class="w-8 h-8 rounded-full bg-indigo-100 flex items-center justify-center mr-3 mt-0.5">
-                                            <i class="fas fa-calendar-alt text-indigo-600 text-sm"></i>
-                                        </div>
-                                        <div class="flex-1">
-                                            <p class="text-sm text-gray-600">ປີການສຶກສາ</p>
-                                            <p class="font-semibold text-gray-800" id="academic-year"><?= htmlspecialchars($academic_year_name) ?></p>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Instructions Card -->
-                    <div class="bg-white rounded-2xl shadow-xl overflow-hidden">
-                        <div class="bg-gradient-to-r from-blue-500 to-cyan-500 px-6 py-4">
-                            <h3 class="text-xl font-bold text-white flex items-center">
-                                <i class="fas fa-info-circle mr-3"></i>
-                                ຄຳແນະນຳສຳຄັນ
-                            </h3>
-                        </div>
-                        <div class="p-6">
-                            <div class="space-y-3 text-gray-700">
-                                <div class="flex items-start">
-                                    <i class="fas fa-check-circle text-green-500 mr-3 mt-1"></i>
-                                    <p>ກະລຸນາບັນທຶກ QR Code ນີ້ເອົາໄວ້ສຳລັບການຢືນຢັນຕົວຕົນ</p>
-                                </div>
-                                <div class="flex items-start">
-                                    <i class="fas fa-check-circle text-green-500 mr-3 mt-1"></i>
-                                    <p>ສະແດງ QR Code ຕໍ່ເຈົ້າໜ້າທີເພື່ອຢືນຢັນການລົງທະບຽນ</p>
-                                </div>
-                                <div class="flex items-start">
-                                    <i class="fas fa-check-circle text-green-500 mr-3 mt-1"></i>
-                                    <p>ທ່ານສາມາດດາວໂຫລດ QR Code ຫຼື ບັນທຶກໜ້ານີ້ໄວ້</p>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Action Buttons -->
-                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 print-hidden">
-                        <a href="<?= $qr_code_url ?>" target="_blank" download="qrcode-<?= htmlspecialchars($studentData['student_id'] ?? 'student') ?>.png"
-                           class="bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white py-4 px-6 rounded-xl flex items-center justify-center transition-all duration-300 transform hover:scale-105 shadow-lg">
-                            <i class="fas fa-download mr-3 text-lg"></i>
-                            <span class="font-medium">ດາວໂຫລດ QR Code</span>
-                        </a>
-                        <a href="<?= BASE_URL ?>index.php?page=register"
-                           class="bg-gradient-to-r from-gray-600 to-gray-700 hover:from-gray-700 hover:to-gray-800 text-white py-4 px-6 rounded-xl flex items-center justify-center transition-all duration-300 transform hover:scale-105 shadow-lg">
-                            <i class="fas fa-user-plus mr-3 text-lg"></i>
-                            <span class="font-medium">ລົງທະບຽນເພີ່ມ</span>
-                        </a>
-                    </div>
-                </div>
-                
-                <!-- QR Code Section -->
-                <div class="flex flex-col items-center">
-                    <div class="bg-white p-8 rounded-2xl shadow-xl">
-                        <div class="text-center mb-6">
-                            <h3 class="text-2xl font-bold text-gray-800 mb-2">QR Code ຂອງທ່ານ</h3>
-                            <p class="text-gray-600">ສະແກນເພື່ອເບິ່ງຂໍ້ມູນ</p>
-                        </div>
+            
+            <!-- Student Info and QR Code Card -->
+            <div class="bg-white rounded-2xl shadow-2xl p-8 mb-8 animate-fade-in">
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                    
+                    <!-- Student Details -->
+                    <div>
+                        <h2 class="text-2xl font-bold text-gray-800 mb-6 flex items-center">
+                            <i class="fas fa-user-circle mr-3 text-blue-500"></i>
+                            ຂໍ້ມູນນັກສຶກສາ
+                        </h2>
                         
-                        <div class="relative">
-                            <div class="bg-gradient-to-br from-amber-100 to-orange-100 p-6 rounded-2xl border-4 border-amber-200">
-                                <img src="<?= $qr_code_url ?>" alt="QR Code" class="w-80 h-80 mx-auto" 
-                                     onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
-                                <div class="w-80 h-80 bg-gray-100 flex items-center justify-center text-gray-500 rounded-lg mx-auto" style="display: none;">
-                                    <div class="text-center">
-                                        <i class="fas fa-qrcode text-6xl mb-4"></i>
-                                        <p class="text-lg font-medium">QR Code ບໍ່ສາມາດໂຫລດໄດ້</p>
-                                        <p class="text-sm mt-2">ກະລຸນາລອງໃໝ່ອີກຄັ້ງ</p>
+                        <div class="space-y-4">
+                            <div class="flex items-center p-3 bg-gray-50 rounded-lg">
+                                <i class="fas fa-user text-gray-500 w-5 mr-3"></i>
+                                <div>
+                                    <span class="text-gray-600 text-sm">ຊື່ - ນາມສະກຸນ:</span>
+                                    <div class="font-semibold text-gray-800">
+                                        <?= htmlspecialchars($studentData['first_name'] . ' ' . $studentData['last_name']) ?>
                                     </div>
                                 </div>
                             </div>
                             
-                            <!-- QR Code Corner Decorations -->
-                            <div class="absolute -top-2 -left-2 w-6 h-6 border-t-4 border-l-4 border-amber-500 rounded-tl-lg"></div>
-                            <div class="absolute -top-2 -right-2 w-6 h-6 border-t-4 border-r-4 border-amber-500 rounded-tr-lg"></div>
-                            <div class="absolute -bottom-2 -left-2 w-6 h-6 border-b-4 border-l-4 border-amber-500 rounded-bl-lg"></div>
-                            <div class="absolute -bottom-2 -right-2 w-6 h-6 border-b-4 border-r-4 border-amber-500 rounded-br-lg"></div>
-                        </div>
-                        
-                        <div class="text-center mt-6">
-                            <p class="text-lg font-semibold text-gray-800">
-                                <?= htmlspecialchars($studentData['first_name'] . ' ' . $studentData['last_name']) ?>
-                            </p>
-                            <p class="text-gray-600 mt-2">
-                                <i class="fas fa-qrcode mr-2"></i>
-                                ລະຫັດນັກສຶກສາ: <?= htmlspecialchars($studentData['student_id'] ?? 'N/A') ?>
-                            </p>
+                            <div class="flex items-center p-3 bg-blue-50 rounded-lg">
+                                <i class="fas fa-id-card text-blue-500 w-5 mr-3"></i>
+                                <div>
+                                    <span class="text-gray-600 text-sm">ລະຫັດນັກສຶກສາ:</span>
+                                    <div class="font-bold text-blue-600 text-lg">
+                                        <?= htmlspecialchars($studentData['student_id'] ?? 'STU' . str_pad($studentData['id'], 6, '0', STR_PAD_LEFT)) ?>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="flex items-center p-3 bg-purple-50 rounded-lg">
+                                <i class="fas fa-book text-purple-500 w-5 mr-3"></i>
+                                <div>
+                                    <span class="text-gray-600 text-sm">ສາຂາວິຊາ:</span>
+                                    <div class="font-semibold text-purple-700">
+                                        <?= htmlspecialchars($studentData['major_name'] ?? 'ບໍ່ລະບຸ') ?>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="flex items-center p-3 bg-green-50 rounded-lg">
+                                <i class="fas fa-calendar text-green-500 w-5 mr-3"></i>
+                                <div>
+                                    <span class="text-gray-600 text-sm">ປີການສຶກສາ:</span>
+                                    <div class="font-semibold text-green-700">
+                                        <?= htmlspecialchars($studentData['academic_year_name'] ?? 'ບໍ່ລະບຸ') ?>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="flex items-center p-3 bg-orange-50 rounded-lg">
+                                <i class="fas fa-envelope text-orange-500 w-5 mr-3"></i>
+                                <div>
+                                    <span class="text-gray-600 text-sm">ອີເມວ:</span>
+                                    <div class="font-semibold text-orange-700">
+                                        <?= htmlspecialchars($studentData['email'] ?? 'ບໍ່ລະບຸ') ?>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </div>
-
-                    <!-- Print Button -->
-                    <button onclick="window.print()" 
-                            class="mt-6 bg-gradient-to-r from-purple-500 to-indigo-500 hover:from-purple-600 hover:to-indigo-600 text-white py-3 px-8 rounded-xl flex items-center transition-all duration-300 transform hover:scale-105 shadow-lg print-hidden">
-                        <i class="fas fa-print mr-3"></i>
-                        <span class="font-medium">ພິມບັດນັກສຶກສາ</span>
-                    </button>
+                    
+                    <!-- QR Code Section -->
+                    <div class="text-center">
+                        <h2 class="text-2xl font-bold text-gray-800 mb-6 flex items-center justify-center">
+                            <i class="fas fa-qrcode mr-3 text-purple-500"></i>
+                            QR Code ນັກສຶກສາ
+                        </h2>
+                        
+                        <?php if (isset($qrCodeData) && $qrCodeData['success']): ?>
+                            <div class="bg-gradient-to-br from-purple-100 to-blue-100 rounded-2xl p-6 border-2 border-purple-200">
+                                <div class="bg-white rounded-xl p-4 shadow-inner">
+                                    <img src="<?= $qrCodeData['data_url'] ?>" 
+                                         alt="QR Code" 
+                                         class="w-48 h-48 mx-auto rounded-lg shadow-lg"
+                                         onerror="this.src='data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgdmlld0JveD0iMCAwIDIwMCAyMDAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxyZWN0IHdpZHRoPSIyMDAiIGhlaWdodD0iMjAwIiBmaWxsPSIjRjNGNEY2Ii8+CjxwYXRoIGQ9Ik0xMDAgNTBMMTUwIDEwMEwxMDAgMTUwTDUwIDEwMEwxMDAgNTBaIiBzdHJva2U9IiM2QjcyODAiIHN0cm9rZS13aWR0aD0iMiIgZmlsbD0ibm9uZSIvPgo8dGV4dCB4PSIxMDAiIHk9IjE4MCIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZmlsbD0iIzZCNzI4MCIgZm9udC1zaXplPSIxMiI+UVIgQ29kZSBFcnJvcjwvdGV4dD4KPC9zdmc+Cg=='">
+                                </div>
+                                
+                                <div class="mt-4 text-sm text-gray-700">
+                                    <p class="font-medium mb-2">📱 ສະແກນເພື່ອເບິ່ງຂໍ້ມູນ</p>
+                                    <p class="text-xs text-gray-600">
+                                        ຫຼື ເຂົ້າເບິ່ງທີ່ເວັບໄຊ ສ່ວນຂໍ້ມູນນັກສຶກສາ
+                                    </p>
+                                    <?php if (isset($qrCodeData['fallback']) && $qrCodeData['fallback']): ?>
+                                        <p class="text-xs text-orange-600 mt-1">
+                                            <i class="fas fa-info-circle"></i> ໃຊ້ Fallback API
+                                        </p>
+                                    <?php endif; ?>
+                                </div>
+                            </div>
+                        <?php else: ?>
+                            <div class="bg-red-50 rounded-2xl p-6 border-2 border-red-200">
+                                <div class="text-red-500 mb-4">
+                                    <i class="fas fa-exclamation-triangle text-4xl"></i>
+                                </div>
+                                <p class="text-red-700 font-medium mb-2">ເກີດຂໍ້ຜິດພາດໃນການສ້າງ QR Code</p>
+                                <p class="text-xs text-red-600 mb-4">
+                                    <?= htmlspecialchars($qrCodeData['error'] ?? 'ຂໍ້ຜິດພາດບໍ່ທຶກ') ?>
+                                </p>
+                                
+                                <!-- Manual Link -->
+                                <div class="bg-white rounded-lg p-4 border">
+                                    <p class="text-sm text-gray-600 mb-2">ເຂົ້າເບິ່ງຂໍ້ມູນໂດຍກົງ:</p>
+                                    <a href="<?= BASE_URL ?>index.php?page=student-detail&id=<?= $studentData['id'] ?>" 
+                                       class="inline-flex items-center px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors">
+                                        <i class="fas fa-external-link-alt mr-2"></i>
+                                        ເບິ່ງຂໍ້ມູນນັກສຶກສາ
+                                    </a>
+                                </div>
+                            </div>
+                        <?php endif; ?>
+                    </div>
                 </div>
             </div>
             
-            <!-- Footer -->
-            <div class="mt-12 bg-white rounded-2xl shadow-xl p-6">
-                <div class="text-center border-t pt-6">
-                    <div class="flex flex-col sm:flex-row items-center justify-center space-y-2 sm:space-y-0 sm:space-x-6 text-sm text-gray-500">
-                        <div class="flex items-center">
-                            <i class="fas fa-receipt mr-2"></i>
-                            <span>ທຸລະກຳເລກທີ: <?= uniqid('REG-') ?></span>
-                        </div>
-                        <div class="flex items-center">
-                            <i class="fas fa-calendar mr-2"></i>
-                            <span>ວັນທີລົງທະບຽນ: <?= date('d/m/Y H:i:s') ?></span>
-                        </div>
-                        <div class="flex items-center">
-                            <i class="fas fa-shield-alt mr-2"></i>
-                            <span>ການລົງທະບຽນຖືກຢືນຢັນ</span>
-                        </div>
-                    </div>
+            <!-- Action Buttons -->
+            <div class="text-center">
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+                    
+                    <?php if (isset($qrCodeData) && $qrCodeData['success']): ?>
+                        <button onclick="downloadQRCode()" 
+                                class="flex items-center justify-center px-6 py-3 bg-purple-500 hover:bg-purple-600 text-white rounded-lg transition-colors duration-200 shadow-lg hover:shadow-xl">
+                            <i class="fas fa-download mr-2"></i>
+                            ດາວໂຫຼດ QR Code
+                        </button>
+                    <?php endif; ?>
+                    
+                    <a href="<?= BASE_URL ?>index.php?page=student-detail&id=<?= $studentData['id'] ?>" 
+                       class="flex items-center justify-center px-6 py-3 bg-blue-500 hover:bg-blue-600 text-white rounded-lg transition-colors duration-200 shadow-lg hover:shadow-xl">
+                        <i class="fas fa-eye mr-2"></i>
+                        ເບິ່ງຂໍ້ມູນລະອຽດ
+                    </a>
+                    
+                    <a href="<?= BASE_URL ?>index.php?page=register" 
+                       class="flex items-center justify-center px-6 py-3 bg-green-500 hover:bg-green-600 text-white rounded-lg transition-colors duration-200 shadow-lg hover:shadow-xl">
+                        <i class="fas fa-plus mr-2"></i>
+                        ລົງທະບຽນເພີ່ມ
+                    </a>
+                    
+                    <a href="<?= BASE_URL ?>index.php?page=students" 
+                       class="flex items-center justify-center px-6 py-3 bg-gray-500 hover:bg-gray-600 text-white rounded-lg transition-colors duration-200 shadow-lg hover:shadow-xl">
+                        <i class="fas fa-list mr-2"></i>
+                        ລາຍຊື່ນັກສຶກສາ
+                    </a>
                 </div>
+                
+                <!-- Back to Home -->
+                <a href="<?= BASE_URL ?>index.php" 
+                   class="inline-flex items-center px-8 py-3 bg-amber-500 hover:bg-amber-600 text-white rounded-lg transition-colors duration-200 shadow-lg hover:shadow-xl">
+                    <i class="fas fa-home mr-2"></i>
+                    ກັບໜ້າຫຼັກ
+                </a>
             </div>
         </div>
     </div>
-</div>
-
-<script>
-document.addEventListener('DOMContentLoaded', function() {
-    // Auto-scroll to top for better UX
-    window.scrollTo(0, 0);
     
-    // แสดง SweetAlert2 เมื่อลงทะเบียนสำเร็จ
-    <?php if (isset($showSuccessAlert) && $showSuccessAlert): ?>
-    Swal.fire({
-        title: '🎉 ລົງທະບຽນສຳເລັດ!',
-        html: `
-            <div class="text-center">
-                <div class="mb-4">
-                    <i class="fas fa-check-circle text-green-500 text-6xl mb-3"></i>
-                </div>
-                <h3 class="text-xl font-bold mb-3">ຍິນດີຕ້ອນຮັບສູ່ວິທະຍາໄລ!</h3>
-                <div class="bg-gradient-to-r from-blue-50 to-indigo-50 p-4 rounded-lg border-l-4 border-blue-500 mb-4">
-                    <p class="text-sm text-gray-600 mb-1">ລະຫັດນັກສຶກສາ</p>
-                    <p class="text-2xl font-bold text-blue-600 font-mono"><?= htmlspecialchars($studentData['student_id'] ?? 'N/A') ?></p>
-                </div>
-                <div class="text-left space-y-2">
-                    <p><i class="fas fa-user text-amber-500 mr-2"></i><strong>ຊື່:</strong> <?= htmlspecialchars($studentData['first_name'] . ' ' . $studentData['last_name']) ?></p>
-                    <p><i class="fas fa-graduation-cap text-blue-500 mr-2"></i><strong>ສາຂາ:</strong> <?= htmlspecialchars($major_name) ?></p>
-                    <p><i class="fas fa-calendar text-indigo-500 mr-2"></i><strong>ປີການສຶກສາ:</strong> <?= htmlspecialchars($academic_year_name) ?></p>
-                </div>
-                <div class="mt-4 p-3 bg-green-50 rounded-lg border border-green-200">
-                    <p class="text-sm text-green-700">
-                        <i class="fas fa-info-circle mr-1"></i>
-                        ກະລຸນາບັນທຶກ QR Code ເພື່ອການຢືນຢັນຕົວຕົນ
-                    </p>
-                </div>
-            </div>
-        `,
-        icon: 'success',
-        confirmButtonText: 'ເບິ່ງ QR Code',
-        confirmButtonColor: '#f59e0b',
-        showCancelButton: true,
-        cancelButtonText: 'ລົງທະບຽນເພີ່ມ',
-        cancelButtonColor: '#6b7280',
-        customClass: {
-            popup: 'swal2-popup-large',
-            title: 'text-2xl font-bold',
-            htmlContainer: 'text-left'
-        },
-        showClass: {
-            popup: 'animate__animated animate__fadeInDown'
-        },
-        hideClass: {
-            popup: 'animate__animated animate__fadeOutUp'
+    <script>
+        // ดาวน์โหลด QR Code
+        function downloadQRCode() {
+            <?php if (isset($qrCodeData) && $qrCodeData['success']): ?>
+                try {
+                    const link = document.createElement('a');
+                    link.href = '<?= $qrCodeData['data_url'] ?>';
+                    link.download = 'qr-code-<?= htmlspecialchars($studentData['student_id'] ?? 'student') ?>.png';
+                    link.target = '_blank';
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                    
+                    // แสดงข้อความยืนยัน
+                    Swal.fire({
+                        title: 'ກຳລັງດາວໂຫຼດ...',
+                        text: 'QR Code ກຳລັງຖືກດາວໂຫຼດ',
+                        icon: 'success',
+                        timer: 2000,
+                        showConfirmButton: false
+                    });
+                } catch (error) {
+                    Swal.fire({
+                        title: 'ເກີດຂໍ້ຜິດພາດ!',
+                        text: 'ບໍ່ສາມາດດາວໂຫຼດ QR Code ໄດ້',
+                        icon: 'error',
+                        confirmButtonText: 'ຮູ້ແລ້ວ'
+                    });
+                }
+            <?php endif; ?>
         }
-    }).then((result) => {
-        if (result.isDismissed && result.dismiss === Swal.DismissReason.cancel) {
-            // ไปหน้าลงทะเบียนใหม่
-            window.location.href = '<?= BASE_URL ?>index.php?page=register';
-        } else if (result.isConfirmed) {
-            // Scroll ไปยัง QR Code
-            document.querySelector('.grid.lg\\:grid-cols-2 .flex.flex-col.items-center').scrollIntoView({
-                behavior: 'smooth',
-                block: 'center'
-            });
-            
-            // Highlight QR Code section
-            const qrSection = document.querySelector('.grid.lg\\:grid-cols-2 .flex.flex-col.items-center .bg-white.p-8');
-            if (qrSection) {
-                qrSection.classList.add('ring-4', 'ring-amber-300', 'ring-opacity-50');
-                setTimeout(() => {
-                    qrSection.classList.remove('ring-4', 'ring-amber-300', 'ring-opacity-50');
-                }, 3000);
-            }
-        }
-    });
-    <?php endif; ?>
-    
-    console.log('Registration completed successfully!');
-});
-
-// เพิ่ม custom CSS สำหรับ SweetAlert2
-const style = document.createElement('style');
-style.textContent = `
-    .swal2-popup-large {
-        width: 600px !important;
-        max-width: 90vw !important;
-    }
-    
-    .swal2-popup {
-        border-radius: 1rem !important;
-    }
-    
-    .swal2-title {
-        color: #1f2937 !important;
-    }
-    
-    /* Animation classes */
-    .animate__animated {
-        animation-duration: 0.5s;
-        animation-fill-mode: both;
-    }
-    
-    .animate__fadeInDown {
-        animation-name: fadeInDown;
-    }
-    
-    .animate__fadeOutUp {
-        animation-name: fadeOutUp;
-    }
-    
-    @keyframes fadeInDown {
-        from {
-            opacity: 0;
-            transform: translate3d(0, -100%, 0);
-        }
-        to {
-            opacity: 1;
-            transform: translate3d(0, 0, 0);
-        }
-    }
-    
-    @keyframes fadeOutUp {
-        from {
-            opacity: 1;
-        }
-        to {
-            opacity: 0;
-            transform: translate3d(0, -100%, 0);
-        }
-    }
-`;
-document.head.appendChild(style);
-</script>
+        
+        // แสดง success alert เมื่อโหลดหน้า
+        document.addEventListener('DOMContentLoaded', function() {
+            <?php if (isset($showSuccessAlert) && $showSuccessAlert): ?>
+                Swal.fire({
+                    title: '🎉 ຍິນດີຕ້ອນຮັບ!',
+                    html: `
+                        <div class="text-center">
+                            <div class="text-6xl mb-4">🎓</div>
+                            <h3 class="text-xl font-bold mb-4 text-gray-800">ລົງທະບຽນສຳເລັດ!</h3>
+                            <p class="text-gray-600 mb-6">ທ່ານໄດ້ເປັນນັກສຶກສາຂອງວິທະຍາໄລການສຶກສາແລ້ວ</p>
+                            <div class="bg-gradient-to-r from-blue-50 to-purple-50 p-4 rounded-lg border-2 border-blue-200">
+                                <p class="text-sm font-medium text-blue-800 mb-1">ລະຫັດນັກສຶກສາ</p>
+                                <p class="text-2xl font-bold text-blue-600">
+                                    <?= htmlspecialchars($studentData['student_id'] ?? 'STU' . str_pad($studentData['id'], 6, '0', STR_PAD_LEFT)) ?>
+                                </p>
+                            </div>
+                        </div>
+                    `,
+                    confirmButtonText: 'ເບິ່ງ QR Code',
+                    confirmButtonColor: '#8b5cf6',
+                    allowOutsideClick: false,
+                    width: '500px'
+                });
+            <?php endif; ?>
+        });
+    </script>
+</body>
+</html>

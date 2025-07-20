@@ -6,8 +6,9 @@
         "php": "^7.4 || ^8.0",
         "ext-pdo": "*",
         "phpoffice/phpspreadsheet": "^1.28",
-         "endroid/qr-code": "^4.6",
-         "mpdf/mpdf": "^8.2"
+         "mpdf/mpdf": "^8.2",
+          "endroid/qr-code": "^6.0",
+        "tecnickcom/tcpdf": "^6.10"
     },
     "autoload": {
         "psr-4": {

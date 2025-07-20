@@ -9,6 +9,17 @@ require_once '../config/config.php';
 require_once '../config/database.php';
 require_once '../src/helpers/functions.php';
 
+// Load Composer autoloader for vendor libraries
+require_once '../vendor/autoload.php';
+
+// QR Code classes for download handling
+use Endroid\QrCode\Color\Color;
+use Endroid\QrCode\Encoding\Encoding;
+use Endroid\QrCode\ErrorCorrectionLevel;
+use Endroid\QrCode\QrCode;
+use Endroid\QrCode\RoundBlockSizeMode;
+use Endroid\QrCode\Writer\PngWriter;
+
 // ตัดสินใจว่าหน้าใดที่จะแสดง
 $page = isset($_GET['page']) ? $_GET['page'] : 'home';
 $action = isset($_GET['action']) ? $_GET['action'] : 'view';
@@ -22,210 +33,357 @@ try {
     $error = "ບໍ່ສາມາດເຊື່ອມຕໍ່ກັບຖານຂໍ້ມູນໄດ້. ກະລຸນາລອງໃໝ່ພາຍຫຼັງ.";
 }
 
+// Handle QR code download requests BEFORE any HTML output
+if ($page === 'qrcode' && isset($_GET['download']) && !empty($_GET['download'])) {
+    $url = $_GET['url'] ?? '';
+    $size = (int)($_GET['size'] ?? 300);
+    
+    if ($size < 100 || $size > 1000) {
+        $size = 300;
+    }
+    
+    if (!empty($url)) {
+        try {
+            // Clean and validate URL
+            $url = trim($url);
+            if (!filter_var($url, FILTER_VALIDATE_URL) && !preg_match('/^https?:\/\//', $url)) {
+                $url = 'http://' . $url;
+            }
+            
+            // Create filename based on URL hash
+            $urlHash = md5($url);
+            $filename = "qrcode_{$urlHash}_{$size}.png";
+            $filePath = BASE_PATH . "/public/qrcodes/{$filename}";
+            
+            // Check if file exists
+            if (file_exists($filePath)) {
+                // Clean any output buffers
+                while (ob_get_level()) {
+                    ob_end_clean();
+                }
+                
+                $downloadFilename = 'qrcode_' . date('Y-m-d_H-i-s') . '.png';
+                
+                header('Content-Type: application/octet-stream');
+                header('Content-Disposition: attachment; filename="' . $downloadFilename . '"');
+                header('Content-Length: ' . filesize($filePath));
+                header('Cache-Control: no-cache, must-revalidate');
+                header('Expires: Sat, 26 Jul 1997 05:00:00 GMT');
+                
+                readfile($filePath);
+                exit;
+            }
+        } catch (Exception $e) {
+            error_log("QR download error: " . $e->getMessage());
+        }
+    }
+}
+
+// ฟังก์ชันสำหรับจัดการไฟล์อัพโหลด
+function handleFileUpload($file) {
+    if (!$file || $file['error'] !== UPLOAD_ERR_OK) {
+        return ['success' => false, 'error' => 'ບໍ່ມີໄຟລ໌ຫຼືເກີດຂໍ້ຜິດພາດໃນການອັບໂຫຼດ'];
+    }
+    
+    // ตรวจสอบขนาดไฟล์ (5MB)
+    if ($file['size'] > 5 * 1024 * 1024) {
+        return ['success' => false, 'error' => 'ຂະໜາດໄຟລ໌ໃຫຍ່ເກີນໄປ'];
+    }
+    
+    // ตรวจสอบประเภทไฟล์
+    $allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif'];
+    if (!in_array($file['type'], $allowedTypes)) {
+        return ['success' => false, 'error' => 'ປະເພດໄຟລ໌ບໍ່ຖືກຕ້ອງ'];
+    }
+    
+    // สร้างโฟลเดอร์ถ้าไม่มี
+    $uploadDir = BASE_PATH . '/public/uploads/photos/';
+    if (!file_exists($uploadDir)) {
+        mkdir($uploadDir, 0755, true);
+    }
+    
+    // สร้างชื่อไฟล์ใหม่
+    $extension = pathinfo($file['name'], PATHINFO_EXTENSION);
+    $filename = 'student_' . time() . '_' . mt_rand(1000, 9999) . '.' . $extension;
+    $filepath = $uploadDir . $filename;
+    
+    // ย้ายไฟล์
+    if (move_uploaded_file($file['tmp_name'], $filepath)) {
+        return ['success' => true, 'filename' => $filename, 'filepath' => $filepath];
+    } else {
+        return ['success' => false, 'error' => 'ບໍ່ສາມາດບັນທຶກໄຟລ໌ໄດ້'];
+    }
+}
+
 // ตรวจสอบว่ามีการส่งฟอร์ม POST และประมวลผลการลงทะเบียน
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && $page === 'register' && $action === 'process') {
     try {
-        require_once '../src/classes/Student.php';
+        // รับข้อมูลจากฟอร์ม
+        $studentData = [
+            'first_name' => $_POST['first_name'] ?? '',
+            'last_name' => $_POST['last_name'] ?? '',
+            'gender' => $_POST['gender'] ?? '',
+            'dob' => $_POST['dob'] ?? '',
+            'email' => $_POST['email'] ?? '',
+            'phone' => $_POST['phone'] ?? '',
+            'village' => $_POST['village'] ?? '',
+            'district' => $_POST['district'] ?? '',
+            'province' => $_POST['province'] ?? '',
+            'accommodation_type' => $_POST['accommodation_type'] ?? '',
+            'major_id' => $_POST['major_id'] ?? '',
+            'academic_year_id' => $_POST['academic_year_id'] ?? '',
+            'previous_school' => $_POST['previous_school'] ?? ''
+        ];
+        
+        // จัดการไฟล์รูปภาพ
+        $photoResult = handleFileUpload($_FILES['photo'] ?? null);
+        if ($photoResult['success']) {
+            $studentData['photo'] = $photoResult['filename'];
+        } else {
+            throw new Exception($photoResult['error']);
+        }
+        
+        // สร้าง student object
+        require_once BASE_PATH . '/src/classes/Student.php';
         $student = new Student($db);
         
-        // ดึงข้อมูลจากฟอร์ม
-        $student->first_name = $_POST['first_name'];
-        $student->last_name = $_POST['last_name'];
-        $student->gender = $_POST['gender'];
-        $student->dob = $_POST['dob'];
-        $student->email = !empty($_POST['email']) ? $_POST['email'] : null;
-        $student->phone = !empty($_POST['phone']) ? $_POST['phone'] : null;
-        $student->village = !empty($_POST['village']) ? $_POST['village'] : null;
-        $student->district = !empty($_POST['district']) ? $_POST['district'] : null;
-        $student->province = !empty($_POST['province']) ? $_POST['province'] : null;
-        $student->accommodation_type = $_POST['accommodation_type'];
-        $student->previous_school = !empty($_POST['previous_school']) ? $_POST['previous_school'] : null;
-        $student->major_id = (int)$_POST['major_id'];
-        $student->academic_year_id = (int)$_POST['academic_year_id'];
-        
-        // จัดการอัปโหลดรูปภาพ
-        if (!empty($_FILES['photo']['name'])) {
-            $upload_dir = '../public/uploads/photos/';
-            
-            // สร้างไดเรกทอรีถ้าไม่มี
-            if (!file_exists($upload_dir)) {
-                mkdir($upload_dir, 0777, true);
-            }
-            
-            // กำหนดชื่อไฟล์ใหม่
-            $file_ext = strtolower(pathinfo($_FILES['photo']['name'], PATHINFO_EXTENSION));
-            $file_name = uniqid() . '.' . $file_ext;
-            $file_path = $upload_dir . $file_name;
-            
-            // ย้ายไฟล์ที่อัปโหลดมา
-            if (move_uploaded_file($_FILES['photo']['tmp_name'], $file_path)) {
-                $student->photo = $file_name;
+        // ตั้งค่าข้อมูลให้ student object
+        foreach ($studentData as $key => $value) {
+            if (property_exists($student, $key)) {
+                $student->$key = $value;
             }
         }
         
         // บันทึกข้อมูล
         if ($student->create()) {
-            // ดึงข้อมูลนักศึกษาที่เพิ่งลงทะเบียน
-            $studentData = $student->readOne($student->id);
+            // ดึงข้อมูลที่เพิ่งสร้างจาก database
+            $newStudentId = $student->id;
             
-            // เก็บข้อมูลใน session สำหรับหน้า registration-success
-            $_SESSION['studentData'] = $studentData;
-            $_SESSION['registration_success'] = true;
-            $_SESSION['message'] = "ລົງທະບຽນສຳເລັດແລ້ວ!";
-            $_SESSION['message_type'] = "success";
+            // Query ข้อมูลเต็มรูปแบบ
+            $query = "SELECT s.*, 
+                             m.name as major_name,
+                             ay.year as academic_year_name
+                      FROM students s
+                      LEFT JOIN majors m ON s.major_id = m.id
+                      LEFT JOIN academic_years ay ON s.academic_year_id = ay.id
+                      WHERE s.id = ?";
             
-            // Redirect ไปหน้า registration-success
-            header("Location: index.php?page=registration-success");
-            exit;
+            $stmt = $db->prepare($query);
+            $stmt->execute([$newStudentId]);
+            $studentFullData = $stmt->fetch(PDO::FETCH_ASSOC);
+            
+            if ($studentFullData) {
+                // สร้าง student_id ถ้ายังไม่มี
+                if (empty($studentFullData['student_id'])) {
+                    $studentId = 'STU' . str_pad($newStudentId, 6, '0', STR_PAD_LEFT);
+                    $updateQuery = "UPDATE students SET student_id = ? WHERE id = ?";
+                    $updateStmt = $db->prepare($updateQuery);
+                    $updateStmt->execute([$studentId, $newStudentId]);
+                    $studentFullData['student_id'] = $studentId;
+                }
+                
+                // สร้าง QR Code
+                require_once BASE_PATH . '/src/classes/QrCodeGenerator.php';
+                $qrCodeData = QrCodeGenerator::generateStudentQrCode($studentFullData);
+                
+                // เก็บข้อมูลใน session
+                $_SESSION['student_data'] = $studentFullData;
+                $_SESSION['qr_code_data'] = $qrCodeData;
+                $_SESSION['registration_success'] = true;
+                $_SESSION['show_success_alert'] = true;
+                
+                // Debug log
+                error_log("Registration successful - Student ID: " . $newStudentId);
+                
+                // Redirect
+                header("Location: " . BASE_URL . "index.php?page=registration-success");
+                exit;
+                
+            } else {
+                throw new Exception('ບໍ່ສາມາດດຶງຂໍ້ມູນນັກສຶກສາທີ່ຫາກໍ່ສ້າງໄດ້');
+            }
+            
         } else {
-            throw new Exception("ເກີດຂໍ້ຜິດພາດໃນການລົງທະບຽນ");
+            throw new Exception('ບໍ່ສາມາດບັນທຶກຂໍ້ມູນລົງຖານຂໍ້ມູນໄດ້');
         }
+        
     } catch (Exception $e) {
+        error_log("Registration error: " . $e->getMessage());
         $_SESSION['message'] = $e->getMessage();
-        $_SESSION['message_type'] = "error";
-        header("Location: index.php?page=register");
+        $_SESSION['message_type'] = 'error';
+        header("Location: " . BASE_URL . "index.php?page=register");
         exit;
     }
 }
 
-// จัดการการอัพเดทข้อมูลนักศึกษา
+// ตรวจสอบว่ามีการส่งฟอร์ม POST สำหรับการอัปเดตข้อมูลนักศึกษา
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && $page === 'student-edit' && $action === 'update') {
-    require_once '../src/classes/Student.php';
-    
     try {
-        // สร้างออบเจ็กต์ Student
-        $student = new Student($db);
-        
-        // ดึงข้อมูล ID
-        $student->id = (int)$_POST['id'];
-        
-        // ตรวจสอบว่ามีนักศึกษาคนนี้จริงหรือไม่
-        $existingStudent = $student->readOne($student->id);
-        if (!$existingStudent) {
-            throw new Exception("ບໍ່ພົບຂໍ້ມູນນັກສຶກສາທີ່ຕ້ອງການແກ້ໄຂ");
+        // ตรวจสอบว่ามี ID ของนักศึกษา
+        if (!isset($_POST['id']) || empty($_POST['id'])) {
+            throw new Exception('ບໍ່ພົບ ID ນັກສຶກສາ');
         }
         
-        // ดึงข้อมูลจากฟอร์ม
-        $student->first_name = $_POST['first_name'];
-        $student->last_name = $_POST['last_name'];
-        $student->gender = $_POST['gender'];
-        $student->dob = $_POST['dob'];
-        $student->email = !empty($_POST['email']) ? $_POST['email'] : null;
-        $student->phone = !empty($_POST['phone']) ? $_POST['phone'] : null;
-        $student->village = !empty($_POST['village']) ? $_POST['village'] : null;
-        $student->district = !empty($_POST['district']) ? $_POST['district'] : null;
-        $student->province = !empty($_POST['province']) ? $_POST['province'] : null;
-        $student->accommodation_type = $_POST['accommodation_type'];
-        $student->previous_school = !empty($_POST['previous_school']) ? $_POST['previous_school'] : null;
-        $student->major_id = (int)$_POST['major_id'];
-        $student->academic_year_id = (int)$_POST['academic_year_id'];
+        $studentId = (int)$_POST['id'];
         
-        // จัดการอัปโหลดรูปภาพ
-        if (!empty($_FILES['photo']['name'])) {
-            $upload_dir = '../public/uploads/photos/';
-            
-            // สร้างโฟลเดอร์ถ้ายังไม่มี
-            if (!file_exists($upload_dir)) {
-                mkdir($upload_dir, 0777, true);
-            }
-            
-            // ลบรูปเก่าถ้ามี
-            if (!empty($existingStudent['photo']) && file_exists($upload_dir . $existingStudent['photo'])) {
-                unlink($upload_dir . $existingStudent['photo']);
-            }
-            
-            // ตั้งชื่อไฟล์ใหม่
-            $file_ext = strtolower(pathinfo($_FILES['photo']['name'], PATHINFO_EXTENSION));
-            $file_name = uniqid() . '.' . $file_ext;
-            $file_path = $upload_dir . $file_name;
-            
-            // ย้ายไฟล์ที่อัปโหลดมา
-            if (move_uploaded_file($_FILES['photo']['tmp_name'], $file_path)) {
-                $student->photo = $file_name;
+        // รับข้อมูลจากฟอร์ม
+        $studentData = [
+            'first_name' => $_POST['first_name'] ?? '',
+            'last_name' => $_POST['last_name'] ?? '',
+            'gender' => $_POST['gender'] ?? '',
+            'dob' => $_POST['dob'] ?? '',
+            'email' => $_POST['email'] ?? '',
+            'phone' => $_POST['phone'] ?? '',
+            'village' => $_POST['village'] ?? '',
+            'district' => $_POST['district'] ?? '',
+            'province' => $_POST['province'] ?? '',
+            'accommodation_type' => $_POST['accommodation_type'] ?? '',
+            'major_id' => $_POST['major_id'] ?? '',
+            'academic_year_id' => $_POST['academic_year_id'] ?? '',
+            'previous_school' => $_POST['previous_school'] ?? ''
+        ];
+        
+        // สร้าง student object และดึงข้อมูลเดิม
+        require_once BASE_PATH . '/src/classes/Student.php';
+        $student = new Student($db);
+        $existingData = $student->readOne($studentId);
+        
+        if (!$existingData) {
+            throw new Exception('ບໍ່ພົບຂໍ້ມູນນັກສຶກສາທີ່ຕ້ອງການແກ້ໄຂ');
+        }
+        
+        // จัดการไฟล์รูปภาพ
+        if (isset($_FILES['photo']) && $_FILES['photo']['error'] === UPLOAD_ERR_OK) {
+            $photoResult = handleFileUpload($_FILES['photo']);
+            if ($photoResult['success']) {
+                $studentData['photo'] = $photoResult['filename'];
+                
+                // ลบรูปภาพเดิมถ้ามี
+                if (!empty($existingData['photo'])) {
+                    $oldPhotoPath = BASE_PATH . '/public/uploads/photos/' . $existingData['photo'];
+                    if (file_exists($oldPhotoPath)) {
+                        unlink($oldPhotoPath);
+                    }
+                }
+            } else {
+                throw new Exception($photoResult['error']);
             }
         } else {
-            // ใช้รูปเดิม
-            $student->photo = $_POST['current_photo'];
+            // ใช้รูปภาพเดิม
+            $studentData['photo'] = $existingData['photo'];
+        }
+        
+        // ตั้งค่าข้อมูลให้ student object
+        $student->id = $studentId;
+        foreach ($studentData as $key => $value) {
+            if (property_exists($student, $key)) {
+                $student->$key = $value;
+            }
         }
         
         // บันทึกข้อมูล
         if ($student->update()) {
-            $_SESSION['message'] = "ອັບເດດຂໍ້ມູນສຳເລັດແລ້ວ!";
-            $_SESSION['message_type'] = "success";
-            header("Location: index.php?page=student-detail&id=" . $student->id);
+            $_SESSION['message'] = 'ແກ້ໄຂຂໍ້ມູນນັກສຶກສາສຳເລັດແລ້ວ';
+            $_SESSION['message_type'] = 'success';
+            header("Location: " . BASE_URL . "index.php?page=student-detail&id=" . $studentId);
             exit;
         } else {
-            throw new Exception("ເກີດຂໍ້ຜິດພາດໃນການອັບເດດຂໍ້ມູນ");
+            throw new Exception('ບໍ່ສາມາດບັນທຶກການປ່ຽນແປງໄດ້');
         }
+        
     } catch (Exception $e) {
+        error_log("Student update error: " . $e->getMessage());
         $_SESSION['message'] = $e->getMessage();
-        $_SESSION['message_type'] = "error";
-        header("Location: index.php?page=student-edit&id=" . (int)$_POST['id']);
+        $_SESSION['message_type'] = 'error';
+        header("Location: " . BASE_URL . "index.php?page=student-edit&id=" . ($studentId ?? $_POST['id'] ?? ''));
         exit;
     }
 }
 
-// เพิ่มในส่วนของการจัดการ POST requests
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && $page === 'verify-qrcode') {
-    try {
-        require_once '../src/classes/Student.php';
-        require_once '../src/classes/Major.php';
-        require_once '../src/classes/AcademicYear.php';
-        
-        $student = new Student($db);
-        $result = ['valid' => false, 'message' => ''];
-        
-        if ($action === 'id') {
-            // ตรวจสอบโดยใช้รหัสนักศึกษา
-            $student_id = (int)$_POST['student_id'];
-            $studentData = $student->readOne($student_id);
-            
-            if ($studentData) {
-                // ดึงข้อมูลเพิ่มเติม
-                $majorObj = new Major($db);
-                $major = $majorObj->readOne($studentData['major_id']);
-                
-                $yearObj = new AcademicYear($db);
-                $academicYear = $yearObj->readOne($studentData['academic_year_id']);
-                
-                $studentData['major_name'] = $major['name'];
-                $studentData['academic_year'] = $academicYear['year'];
-                
-                $result = [
-                    'valid' => true,
-                    'student' => $studentData
-                ];
-            } else {
-                $result['message'] = 'ບໍ່ພົບຂໍ້ມູນນັກສຶກສາລະຫັດ ' . $student_id;
-            }
-        } 
-        
-        $_SESSION['verification_result'] = $result;
-        header("Location: index.php?page=verify-qrcode");
-        exit;
-    } catch (Exception $e) {
-        $_SESSION['message'] = $e->getMessage();
-        $_SESSION['message_type'] = "error";
-        header("Location: index.php?page=verify-qrcode");
-        exit;
-    }
-}
-
-// ตรวจสอบหน้า registration-success และดึงข้อมูล
+// ตรวจสอบหน้า registration-success
 if ($page === 'registration-success') {
-    if (isset($_SESSION['studentData'])) {
-        $studentData = $_SESSION['studentData'];
-        $showSuccessAlert = isset($_SESSION['registration_success']) && $_SESSION['registration_success'];
-        unset($_SESSION['studentData']); // ลบออกจาก session หลังจากใช้แล้ว
-        unset($_SESSION['registration_success']);
+    if (isset($_SESSION['student_data'])) {
+        $studentData = $_SESSION['student_data'];
+        $qrCodeData = $_SESSION['qr_code_data'] ?? ['success' => false, 'error' => 'QR Code not generated'];
+        $showSuccessAlert = $_SESSION['show_success_alert'] ?? false;
+        
+        include BASE_PATH . '/templates/registration-success.php';
+        exit;
     } else {
-        // หากไม่มีข้อมูล redirect กลับไปหน้า register
-        $_SESSION['message'] = "ບໍ່ພົບຂໍ້ມູນການລົງທະບຽນ";
+        $_SESSION['message'] = "ບໍ່ພົບຂໍ້ມູນການລົງທະບຽນ ກະລຸນາລອງໃໝ່";
         $_SESSION['message_type'] = "error";
-        header("Location: index.php?page=register");
+        header("Location: " . BASE_URL . "index.php?page=register");
         exit;
     }
 }
+
+// ตรวจสอบหน้า students
+if ($page === 'students') {
+    require_once '../src/classes/Student.php';
+    require_once '../src/classes/Major.php';
+    require_once '../src/classes/AcademicYear.php';
+    
+    $student = new Student($db);
+    $majorObj = new Major($db);
+    $yearObj = new AcademicYear($db);
+    
+    $majors = $majorObj->readAll();
+    $academicYears = $yearObj->readAll();
+    
+    // รับค่า parameters
+    $current_search = $_GET['search'] ?? '';
+    $current_major = intval($_GET['major'] ?? 0);
+    $current_year = intval($_GET['year'] ?? 0);
+    $current_page = intval($_GET['p'] ?? 1);
+    $students_per_page = intval($_GET['students_per_page'] ?? 10);
+    
+    // จัดการการลบ
+    if (isset($_GET['action']) && $_GET['action'] === 'delete' && isset($_GET['id'])) {
+        $delete_id = intval($_GET['id']);
+        
+        if ($student->deleteById($delete_id)) {
+            $_SESSION['message'] = "ລຶບຂໍ້ມູນນັກສຶກສາສຳເລັດແລ້ວ";
+            $_SESSION['message_type'] = "success";
+        } else {
+            $_SESSION['message'] = "ເກີດຂໍ້ຜິດພາດໃນການລຶບຂໍ້ມູນ";
+            $_SESSION['message_type'] = "error";
+        }
+        
+        header("Location: index.php?page=students");
+        exit;
+    }
+    
+    // สร้าง parameters สำหรับ search
+    $search_params = [
+        'search' => $current_search,
+        'major' => $current_major,
+        'year' => $current_year
+    ];
+    
+    // นับจำนวนนักศึกษาทั้งหมด
+    $total_students = $student->countStudentsWithFilter($search_params);
+    
+    // คำนวณ pagination
+    $total_pages = ceil($total_students / $students_per_page);
+    $current_page = max(1, min($current_page, $total_pages));
+    $offset = ($current_page - 1) * $students_per_page;
+    
+    // ดึงข้อมูลนักศึกษา
+    $pagination_params = array_merge($search_params, [
+        'limit' => $students_per_page,
+        'offset' => $offset
+    ]);
+    
+    $students = $student->getStudentsWithPagination($pagination_params);
+    
+    // แก้ไขตรงนี้: เรียก header ก่อนเนื้อหาหลัก
+    include_once '../templates/components/header.php';
+    include BASE_PATH . '/templates/students-list.php';
+    // เรียก footer หลังเนื้อหาหลัก
+    include_once '../templates/components/footer.php';
+    exit;
+}
+
 // จัดการหน้าพิมพ์บัตรนักศึกษา
 if ($page === 'student-card' && isset($_GET['id'])) {
     require_once '../src/classes/Student.php';
@@ -233,128 +391,24 @@ if ($page === 'student-card' && isset($_GET['id'])) {
     $student = new Student($db);
     $student_id = (int)$_GET['id'];
     
-    // เพิ่มการ debug
-    error_log("Requesting student card for ID: " . $student_id);
-    
-    // ตรวจสอบ ID ที่ส่งมา
     if ($student_id <= 0) {
-        error_log("Invalid student ID provided: " . $student_id);
         $_SESSION['message'] = "ID นักศึกษาไม่ถูกต้อง";
         $_SESSION['message_type'] = "error";
         header("Location: index.php?page=students");
         exit;
     }
     
-    // ตรวจสอบว่านักศึกษามีอยู่จริงก่อน
-    $basic_student = $student->readOne($student_id);
-    if (!$basic_student) {
-        error_log("No basic student found for ID: " . $student_id);
-        $_SESSION['message'] = "ບໍ່ພົບຂໍ້ມູນນັກສຶກສາ ID: " . $student_id . " ໃນລະບົບ";
-        $_SESSION['message_type'] = "error";
-        header("Location: index.php?page=students");
-        exit;
-    }
-    
-    error_log("Basic student found: " . print_r($basic_student, true));
-    
-    // ดึงข้อมูลสำหรับพิมพ์บัตร
     $student_data = $student->getStudentForCard($student_id);
     
     if (!$student_data) {
-        error_log("Failed to get student card data for ID: " . $student_id);
-        $_SESSION['message'] = "ເກີດຂໍ້ຜິດພາດໃນການດຶງຂໍ້ມູນສຳລັບພິມບັດ - ID: " . $student_id;
+        $_SESSION['message'] = "ເກີດຂໍ້ຜິດພາດໃນການດຶງຂໍ້ມູນສຳລັບພິມບັດ";
         $_SESSION['message_type'] = "error";
         header("Location: index.php?page=students");
         exit;
     }
     
-    error_log("Student card data retrieved: " . print_r($student_data, true));
-    
-    // ถ้าสำเร็จ ให้ไปที่ template
     include '../templates/student-card.php';
     exit;
-}
-
-// ตรวจสอบหน้า students และเพิ่ม pagination
-if ($page === 'students') {
-    require_once '../src/classes/Student.php';
-    require_once '../src/classes/Major.php';
-    require_once '../src/classes/AcademicYear.php';
-    
-    $student = new Student($db);
-    
-    // เพิ่มการดึงข้อมูลสาขาและปีการศึกษา
-    $majorObj = new Major($db);
-    $majors = $majorObj->readAll();
-    
-    $yearObj = new AcademicYear($db);
-    $academicYears = $yearObj->readAll();
-    
-    // การตั้งค่า pagination
-    $students_per_page = isset($_GET['students_per_page']) ? (int)$_GET['students_per_page'] : 10;
-    $students_per_page = max(5, min(100, $students_per_page));
-    
-    $current_page = isset($_GET['p']) ? (int)$_GET['p'] : 1;
-    $current_page = max(1, $current_page);
-    
-    // การค้นหา - กำหนดค่าเริ่มต้น
-    $current_search = isset($_GET['search']) ? trim($_GET['search']) : '';
-    $current_major = isset($_GET['major']) ? (int)$_GET['major'] : 0;
-    $current_year = isset($_GET['year']) ? (int)$_GET['year'] : 0;
-    
-    // ใช้ตัวแปรเดียวกันสำหรับ methods
-    $search_term = $current_search;
-    $filter_major = $current_major;
-    $filter_year = $current_year;
-    
-    // การลบนักศึกษา (ก่อนดึงข้อมูล)
-    if ($action === 'delete' && isset($_GET['id'])) {
-        $student_id = (int)$_GET['id'];
-        
-        try {
-            if ($student->delete($student_id)) {
-                $_SESSION['message'] = "ລຶບຂໍ້ມູນນັກສຶກສາສຳເລັດແລ້ວ";
-                $_SESSION['message_type'] = "success";
-            } else {
-                $_SESSION['message'] = "ເກີດຂໍ້ຜິດພາດໃນການລຶບຂໍ້ມູນ";
-                $_SESSION['message_type'] = "error";
-            }
-        } catch (Exception $e) {
-            $_SESSION['message'] = "ເກີດຂໍ້ຜິດພາດ: " . $e->getMessage();
-            $_SESSION['message_type'] = "error";
-        }
-        
-        // redirect กลับไปหน้าเดิม
-        $redirect_url = "index.php?page=students";
-        if ($current_page > 1) {
-            $redirect_url .= "&p=" . $current_page;
-        }
-        if (!empty($current_search)) {
-            $redirect_url .= "&search=" . urlencode($current_search);
-        }
-        if ($current_major > 0) {
-            $redirect_url .= "&major=" . $current_major;
-        }
-        if ($current_year > 0) {
-            $redirect_url .= "&year=" . $current_year;
-        }
-        if ($students_per_page != 10) {
-            $redirect_url .= "&students_per_page=" . $students_per_page;
-        }
-        
-        header("Location: " . $redirect_url);
-        exit;
-    }
-    
-    // นับจำนวนนักศึกษาทั้งหมด
-    $total_students = $student->countStudents($search_term, $filter_major, $filter_year);
-    $total_pages = ceil($total_students / $students_per_page);
-    
-    // คำนวณ offset
-    $offset = ($current_page - 1) * $students_per_page;
-    
-    // ดึงข้อมูลนักศึกษาตาม pagination
-    $students = $student->getStudentsWithPagination($students_per_page, $offset, $search_term, $filter_major, $filter_year);
 }
 
 // รวมส่วนหัว (Header) - เฉพาะหน้าที่ต้องการ layout ปกติ
@@ -374,59 +428,17 @@ if (isset($error)) {
             break;
             
         case 'register':
-            include '../templates/register.php';
-            break;
-            
-        case 'students':
-            // ตรวจสอบการลบข้อมูล
-            if (isset($_GET['action']) && $_GET['action'] === 'delete' && isset($_GET['id'])) {
-                require_once '../src/classes/Student.php';
-                $student = new Student($db);
-                $student_id = (int)$_GET['id'];
-                
-                if ($student->delete($student_id)) {
-                    $_SESSION['message'] = "ລຶບຂໍ້ມູນນັກສຶກສາສຳເລັດແລ້ວ";
-                    $_SESSION['message_type'] = "success";
-                } else {
-                    $_SESSION['message'] = "ເກີດຂໍ້ຜິດພາດໃນການລຶບຂໍ້ມູນ";
-                    $_SESSION['message_type'] = "error";
-                }
-                
-                // Redirect กลับไปหน้า students โดยรักษา pagination
-                $redirect_params = $_GET;
-                unset($redirect_params['action'], $redirect_params['id']);
-                $query_string = http_build_query($redirect_params);
-                header("Location: index.php?" . $query_string);
-                exit;
-            }
-            
-            // โหลดข้อมูลสำหรับหน้า students
-            require_once '../src/classes/Student.php';
-            
-            $student = new Student($db);
-            
-            // รับค่าจากการค้นหาและ filter
-            $current_search = isset($_GET['search']) ? trim($_GET['search']) : '';
-            $current_major = isset($_GET['major']) ? (int)$_GET['major'] : 0;
-            $current_year = isset($_GET['year']) ? (int)$_GET['year'] : 0;
-            $current_page = isset($_GET['p']) ? max(1, (int)$_GET['p']) : 1;
-            $students_per_page = isset($_GET['students_per_page']) ? max(5, min(100, (int)$_GET['students_per_page'])) : 10;
-            
-            // คำนวณ offset
-            $offset = ($current_page - 1) * $students_per_page;
-            
-            // ดึงข้อมูลนักศึกษา
-            $students = $student->getStudentsWithPagination($students_per_page, $offset, $current_search, $current_major, $current_year);
-            
-            // นับจำนวนทั้งหมด
-            $total_students = $student->countStudents($current_search, $current_major, $current_year);
-            $total_pages = ceil($total_students / $students_per_page);
-            
             // ดึงข้อมูลสาขาและปีการศึกษา
-            $majors = $student->getAllMajors();
-            $academicYears = $student->getAllAcademicYears();
+            require_once '../src/classes/Major.php';
+            require_once '../src/classes/AcademicYear.php';
             
-            include '../templates/students-list.php';
+            $majorObj = new Major($db);
+            $yearObj = new AcademicYear($db);
+            
+            $majors = $majorObj->readAll();
+            $academicYears = $yearObj->readAll();
+            
+            include '../templates/register.php';
             break;
             
         case 'student-detail':
@@ -452,6 +464,9 @@ if (isset($error)) {
         case 'student-edit':
             if (isset($_GET['id'])) {
                 require_once '../src/classes/Student.php';
+                require_once '../src/classes/Major.php';
+                require_once '../src/classes/AcademicYear.php';
+                
                 $student = new Student($db);
                 $student_data = $student->readOne((int)$_GET['id']);
                 
@@ -463,8 +478,11 @@ if (isset($error)) {
                 }
                 
                 // ดึงข้อมูลสาขาและปีการศึกษา
-                $majors = $student->getAllMajors();
-                $academicYears = $student->getAllAcademicYears();
+                $majorObj = new Major($db);
+                $yearObj = new AcademicYear($db);
+                
+                $majors = $majorObj->readAll();
+                $academicYears = $yearObj->readAll();
                 
                 include '../templates/student-edit.php';
             } else {
@@ -473,8 +491,20 @@ if (isset($error)) {
             }
             break;
             
-        // ไม่ต้องมี case 'student-card' ที่นี่ เพราะจัดการไปแล้วด้านบน
-        
+        case 'qrcode':
+            // Check if QR code libraries are available
+            if (!class_exists('Endroid\QrCode\QrCode')) {
+                echo '<div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative mb-4">';
+                echo '<strong>Error:</strong> QR Code library not available. ';
+                echo '<a href="qrcode.php" class="underline">Try direct QR generator</a>';
+                echo '</div>';
+                include '../templates/dashboard.php';
+            } else {
+                // Include QR Code generator template
+                include '../templates/qrcode.php';
+            }
+            break;
+            
         default:
             include '../templates/dashboard.php';
             break;

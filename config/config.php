@@ -6,7 +6,7 @@ if (!defined('BASE_PATH')) {
     define('BASE_PATH', dirname(__DIR__));
 }
 
-define("BASE_URL", "http://localhost/register-learning/");
+define("BASE_URL", "http://localhost:8080/");
 define("SITE_NAME", "ວິທະຍາໄລຄູສົງ ອົງຕື້ ລະບົບສະໝັກຮຽນ Online");
 
 // ຕັ້ງຄ່າ timezone

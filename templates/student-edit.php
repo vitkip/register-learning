@@ -98,7 +98,7 @@ if (isset($_SESSION['message'])) {
                             
                             <div class="photo-upload-area">
                                 <?php if (!empty($studentData['photo']) && file_exists(BASE_PATH . "/public/uploads/photos/" . $studentData['photo'])): ?>
-                                    <img src="<?= BASE_URL ?>public/uploads/photos/<?= htmlspecialchars($studentData['photo']) ?>" 
+                                    <img src="<?= BASE_URL ?>uploads/photos/<?= htmlspecialchars($studentData['photo']) ?>" 
                                          alt="ຮູບນັກສຶກສາ" 
                                          id="photo-preview"
                                          class="current-photo">

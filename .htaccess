@@ -6,7 +6,15 @@
     RewriteEngine On
     RewriteBase /register-learning/
     
-    # Redirect all requests to public/index.php
+    # Allow direct access to qrcode.php and other specific files
+    RewriteCond %{REQUEST_URI} ^/register-learning/public/(qrcode\.php|qr-examples\.php|test_qr\.php)
+    RewriteRule ^(.*)$ - [L]
+    
+    # Allow direct access to QR code images and assets
+    RewriteCond %{REQUEST_URI} ^/register-learning/public/(qrcodes/|assets/|uploads/|fonts/)
+    RewriteRule ^(.*)$ - [L]
+    
+    # Redirect all other requests to public/index.php
     RewriteCond %{REQUEST_URI} !^/register-learning/public/
     RewriteRule ^(.*)$ public/index.php [L,QSA]
 </IfModule>

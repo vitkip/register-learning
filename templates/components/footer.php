@@ -3,7 +3,7 @@
                 <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
                     <!-- Company Info -->
                     <div class="text-center md:text-left">
-                        <img src="<?= BASE_URL ?>public/assets/img/college-logo.png" alt="<?= SITE_NAME ?> Logo" class="h-16 mx-auto md:mx-0 mb-3">
+                        <img src="<?= BASE_URL ?>assets/img/college-logo.png" alt="<?= SITE_NAME ?> Logo" class="h-16 mx-auto md:mx-0 mb-3">
                         <h3 class="text-lg font-semibold text-gray-800"><?= SITE_NAME ?></h3>
                     </div>
                     

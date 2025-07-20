@@ -75,10 +75,10 @@ $qr_code_url = "https://api.qrserver.com/v1/create-qr-code/?size=400x400&format=
                             <i class="fas fa-edit"></i>
                             ແກ້ໄຂຂໍ້ມູນ
                         </a>
-                        <button onclick="window.print()" class="btn btn-secondary">
+                        <a  href="<?= BASE_URL ?>index.php?page=student-card&id=<?= $student_id ?>" class="btn btn-secondary">
                             <i class="fas fa-print"></i>
                             ພິມບັດນັກສຶກສາ
-                        </button>
+                        </a>
                         <a href="<?= $qr_code_url ?>" target="_blank" download="qrcode-<?= htmlspecialchars($studentData['student_id'] ?? $studentData['id']) ?>.png" class="btn btn-success">
                             <i class="fas fa-download"></i>
                             ດາວໂຫລດ QR Code
@@ -95,7 +95,7 @@ $qr_code_url = "https://api.qrserver.com/v1/create-qr-code/?size=400x400&format=
                         <div class="photo-container fade-in">
                             <!-- Student Photo -->
                             <?php if (!empty($studentData['photo']) && file_exists(BASE_PATH . "/public/uploads/photos/" . $studentData['photo'])): ?>
-                                <img src="<?= BASE_URL ?>public/uploads/photos/<?= htmlspecialchars($studentData['photo']) ?>" 
+                                <img src="<?= BASE_URL ?>uploads/photos/<?= htmlspecialchars($studentData['photo']) ?>" 
                                      alt="ຮູບນັກສຶກສາ" 
                                      class="student-photo">
                             <?php else: ?>

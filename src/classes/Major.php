@@ -62,5 +62,21 @@ class Major {
             return false;
         }
     }
+    
+    /**
+     * ดึงจำนวนสาขาทั้งหมด
+     */
+    public function getTotalCount() {
+        try {
+            $query = "SELECT COUNT(*) as total FROM " . $this->table_name;
+            $stmt = $this->conn->prepare($query);
+            $stmt->execute();
+            $result = $stmt->fetch(PDO::FETCH_ASSOC);
+            return $result['total'] ?? 0;
+        } catch (PDOException $e) {
+            error_log("Database error in Major::getTotalCount(): " . $e->getMessage());
+            return 0;
+        }
+    }
 }
 ?>
