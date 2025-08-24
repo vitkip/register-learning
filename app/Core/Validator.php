@@ -247,6 +247,13 @@ class Validator {
     }
 
     /**
+     * Add custom error (public method)
+     */
+    public function addCustomError($field, $message) {
+        $this->errors[$field][] = $message;
+    }
+
+    /**
      * Get all errors
      */
     public function getErrors() {
